@@ -18,7 +18,10 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
-CODE_REGEX = re.compile(r"\b(\d{5})\b")
+# Prefer codes that appear after the "Telegram code:" label,
+# but fall back to any 5‑digit sequence if needed.
+TELEGRAM_CODE_REGEX = re.compile(r"Telegram code:\s*(\d{5})")
+GENERIC_CODE_REGEX = re.compile(r"\b(\d{5})\b")
 
 
 @dataclass
@@ -83,11 +86,18 @@ async def fetch_sms_code(sms_url: str, timeout: float = 30.0) -> str:
         # Plain text format, keep as-is
         pass
 
-    match = CODE_REGEX.search(text)
-    if not match:
+    # 1) Prefer codes explicitly labeled as "Telegram code: 12345"
+    codes = TELEGRAM_CODE_REGEX.findall(text)
+    # 2) Otherwise, fall back to any 5‑digit sequence in the text
+    if not codes:
+        codes = GENERIC_CODE_REGEX.findall(text)
+
+    if not codes:
         raise ValueError("Could not extract verification code from SMS response")
 
-    code = match.group(1)
+    # If there are multiple matches (e.g. multiple messages concatenated),
+    # use the last one, which is most likely the newest code.
+    code = codes[-1]
     return code
 
 
