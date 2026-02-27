@@ -739,9 +739,10 @@ async def _process_accounts_from_document(message: Message, doc: Document) -> No
 
             await bot.send_message(chat_id, summary)
 
-            # Send result files as documents
+            # Send result files as documents (skip completely empty files,
+            # since Telegram rejects zero‑byte documents).
             for key, path in files.items():
-                if os.path.exists(path):
+                if os.path.exists(path) and os.path.getsize(path) > 0:
                     input_file = FSInputFile(path, filename=os.path.basename(path))
                     await bot.send_document(
                         chat_id,
