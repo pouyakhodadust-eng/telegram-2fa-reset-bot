@@ -18,8 +18,8 @@ This project is a Telegram bot for account resellers that:
 ### Requirements
 
 - Python 3.10+ recommended.
-- A Telegram Bot token.
-- Telegram API ID and API Hash (from `my.telegram.org`).
+- A Telegram Bot token (from `@BotFather`).
+- Telegram API ID and API Hash (see below).
 
 Install dependencies:
 
@@ -33,11 +33,19 @@ Create a `.env` file in the project root with:
 
 ```bash
 BOT_TOKEN=123456:ABC-DEF...
-API_ID=123456
-API_HASH=your_api_hash_here
+API_ID=2040
+API_HASH=b18441a1ff607e10a989891a5462e627
 MAIN_ADMIN_ID=123456789  # your Telegram numeric user ID
 DB_PATH=bot.db           # optional, default is bot.db
 ```
+
+> **Important — API credentials and SMS delivery:**
+> Since February 2023, Telegram only sends login codes via SMS for
+> requests made by official client API credentials. Custom API IDs
+> (from `my.telegram.org`) will only receive in-app codes, which
+> breaks SMS-based verification flows. The values above are the
+> official **Telegram Desktop** credentials (`API_ID=2040`) and are
+> recommended for this bot to work correctly with SMS providers.
 
 ### Running the Bot
 
