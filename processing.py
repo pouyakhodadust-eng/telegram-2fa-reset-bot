@@ -66,11 +66,8 @@ def parse_input_file_content(content: str) -> List[AccountEntry]:
     return entries
 
 
-async def fetch_sms_code(sms_url: str, timeout: float = 30.0) -> str:
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.get(sms_url)
-        resp.raise_for_status()
-        text = resp.text.strip()
+def _extract_code_from_text(raw_text: str) -> Optional[str]:
+    text = raw_text.strip()
 
     # Try JSON format first
     try:
@@ -83,7 +80,6 @@ async def fetch_sms_code(sms_url: str, timeout: float = 30.0) -> str:
         if content:
             text = content
     except json.JSONDecodeError:
-        # Plain text format, keep as-is
         pass
 
     # 1) Prefer codes explicitly labeled as "Telegram code: 12345"
@@ -93,12 +89,45 @@ async def fetch_sms_code(sms_url: str, timeout: float = 30.0) -> str:
         codes = GENERIC_CODE_REGEX.findall(text)
 
     if not codes:
-        raise ValueError("Could not extract verification code from SMS response")
+        return None
 
-    # If there are multiple matches (e.g. multiple messages concatenated),
-    # use the last one, which is most likely the newest code.
-    code = codes[-1]
-    return code
+    return codes[-1]
+
+
+async def fetch_sms_code(
+    sms_url: str,
+    max_attempts: int = 12,
+    poll_interval: float = 5.0,
+    timeout: float = 15.0,
+) -> str:
+    """
+    Poll the SMS API up to `max_attempts` times (default 12 x 5s = 60s)
+    waiting for a verification code to appear.
+    """
+    last_raw = ""
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for attempt in range(1, max_attempts + 1):
+            resp = await client.get(sms_url)
+            resp.raise_for_status()
+            last_raw = resp.text.strip()
+
+            code = _extract_code_from_text(last_raw)
+            if code:
+                logger.info("SMS code extracted on attempt %d/%d", attempt, max_attempts)
+                return code
+
+            logger.debug(
+                "Attempt %d/%d: no code yet, raw response: %s",
+                attempt, max_attempts, last_raw[:200],
+            )
+
+            if attempt < max_attempts:
+                await asyncio.sleep(poll_interval)
+
+    raise ValueError(
+        f"Could not extract verification code after {max_attempts} attempts. "
+        f"Last response: {last_raw[:200]}"
+    )
 
 
 def build_proxy(
