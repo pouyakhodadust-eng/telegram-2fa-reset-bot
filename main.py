@@ -132,19 +132,8 @@ async def cmd_start(message: Message) -> None:
     if user_id == settings.main_admin_id:
         await add_user(user_id, admin=True)
 
-    if not await is_whitelisted(user_id):
-        if user_id == settings.main_admin_id:
-            await message.answer(
-                "👋 Main admin recognized.\n\n"
-                "Tap **🛡 Admin Panel** below to manage whitelisted users.",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=main_menu_kb(is_admin=True),
-            )
-        else:
-            await message.answer(
-                "⛔ You are not on the whitelist.\n"
-                "Ask the main admin to add you to the bot."
-            )
+    # Only allow authorized users to see the menu
+    if not await ensure_authorized(message, user_id=user_id):
         return
 
     is_admin_flag = await is_admin(user_id)
@@ -349,7 +338,7 @@ async def cb_back_main(callback: CallbackQuery) -> None:
     user_id = callback.from_user.id
     is_admin_flag = await is_admin(user_id)
     await callback.answer()
-    await callback.message.answer(
+    await callback.message.edit_text(
         "🏠 Back to main menu:",
         reply_markup=main_menu_kb(is_admin=is_admin_flag),
     )
@@ -362,7 +351,7 @@ async def cb_menu_proxies(callback: CallbackQuery) -> None:
     if not await ensure_authorized(callback.message, user_id=callback.from_user.id if callback.from_user else None):
         return
     await callback.answer()
-    await callback.message.answer(
+    await callback.message.edit_text(
         "⚙️ <b>Proxy management</b>\n\n"
         "Use the buttons below to add, list, or remove your SOCKS5 proxies.",
         parse_mode=ParseMode.HTML,
@@ -379,9 +368,9 @@ async def cb_menu_stats(callback: CallbackQuery) -> None:
 
     await callback.answer()
     message = callback.message
-    s = await get_stats(message.from_user.id)
+    s = await get_stats(callback.from_user.id)
     if not s:
-        await message.answer("ℹ️ No statistics available yet.")
+        await message.edit_text("ℹ️ No statistics available yet.")
         return
 
     text = (
@@ -392,7 +381,7 @@ async def cb_menu_stats(callback: CallbackQuery) -> None:
         f"- Reset failed: {s['reset_failed']}\n"
         f"- Email required: {s['email_required']}"
     )
-    await message.answer("📊 <b>Your stats</b>:\n\n" + text, parse_mode=ParseMode.HTML)
+    await message.edit_text("📊 <b>Your stats</b>:\n\n" + text, parse_mode=ParseMode.HTML)
 
 
 @router.callback_query(F.data == "menu_admin")
@@ -405,7 +394,7 @@ async def cb_menu_admin(callback: CallbackQuery) -> None:
         return
 
     await callback.answer()
-    await callback.message.answer(
+    await callback.message.edit_text(
         "🛡 <b>Admin panel</b>\n\nChoose an action:",
         parse_mode=ParseMode.HTML,
         reply_markup=admin_menu_kb(),
@@ -434,7 +423,7 @@ async def cb_proxy_add(callback: CallbackQuery, state: FSMContext) -> None:
 
     await state.set_state(ProxyStates.adding)
     await callback.answer()
-    await callback.message.answer(
+    await callback.message.edit_text(
         "➕ <b>Add SOCKS5 proxies</b>\n\n"
         "Send your proxies in the format:\n"
         "`host:port` or `host:port:username:password`.\n"
@@ -452,9 +441,9 @@ async def cb_proxy_list(callback: CallbackQuery) -> None:
 
     await callback.answer()
     message = callback.message
-    proxies = await list_proxies(message.from_user.id)
+    proxies = await list_proxies(callback.from_user.id)
     if not proxies:
-        await message.answer("⚠️ You have no proxies configured.")
+        await message.edit_text("⚠️ You have no proxies configured.")
         return
 
     lines = []
@@ -464,7 +453,7 @@ async def cb_proxy_list(callback: CallbackQuery) -> None:
             auth = f"{p['username']}:***@"
         lines.append(f"{p['id']}: {auth}{p['host']}:{p['port']}")
 
-    await message.answer("📃 <b>Your proxies</b>:\n" + "\n".join(lines), parse_mode=ParseMode.HTML)
+    await message.edit_text("📃 <b>Your proxies</b>:\n" + "\n".join(lines), parse_mode=ParseMode.HTML)
 
 
 @router.callback_query(F.data == "proxy_remove")
@@ -476,7 +465,7 @@ async def cb_proxy_remove(callback: CallbackQuery, state: FSMContext) -> None:
 
     await state.set_state(ProxyStates.removing)
     await callback.answer()
-    await callback.message.answer(
+    await callback.message.edit_text(
         "🗑 <b>Remove proxy</b>\n\n"
         "Send the proxy ID to remove (you can send multiple IDs separated by spaces or new lines).",
         parse_mode=ParseMode.HTML,
@@ -791,7 +780,7 @@ async def cb_menu_process(callback: CallbackQuery, state: FSMContext) -> None:
     proxies_cnt = await count_proxies(callback.from_user.id)
     if proxies_cnt < 2:
         await callback.answer()
-        await callback.message.answer(
+        await callback.message.edit_text(
             f"⚠️ You have {proxies_cnt} proxies configured.\n"
             "At least 2 SOCKS5 proxies are required before processing."
         )
@@ -799,7 +788,7 @@ async def cb_menu_process(callback: CallbackQuery, state: FSMContext) -> None:
 
     await state.set_state(ProcessStates.waiting_for_file)
     await callback.answer()
-    await callback.message.answer(
+    await callback.message.edit_text(
         "📂 <b>Process accounts</b>\n\n"
         "Send a .txt file containing lines in the form:\n"
         "`+phone----sms_api_url`.\n"
