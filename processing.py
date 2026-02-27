@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -156,7 +156,9 @@ async def process_account_on_proxy(
                 logger.info("Account %s: 2FA reset succeeded immediately", masked_phone)
                 return Scenario.RESET_SUCCESS, None
             if isinstance(result, types.account.ResetPasswordRequestedWait):
-                wait_seconds = max(0, int(result.until_date - datetime.utcnow().timestamp()))
+                wait_seconds = max(
+                    0, int(result.until_date - datetime.now(timezone.utc).timestamp())
+                )
                 logger.info(
                     "Account %s: 2FA reset requested, waiting period %s seconds",
                     masked_phone,
@@ -164,7 +166,9 @@ async def process_account_on_proxy(
                 )
                 return Scenario.RESET_TIMER, wait_seconds
             if isinstance(result, types.account.ResetPasswordFailedWait):
-                wait_seconds = max(0, int(result.until_date - datetime.utcnow().timestamp()))
+                wait_seconds = max(
+                    0, int(result.until_date - datetime.now(timezone.utc).timestamp())
+                )
                 logger.info(
                     "Account %s: 2FA reset failed, must wait %s seconds",
                     masked_phone,

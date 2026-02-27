@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Tuple
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -13,6 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     CallbackQuery,
     Document,
+    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
@@ -664,7 +665,7 @@ async def _process_accounts_from_document(message: Message, doc: Document) -> No
     # Download file to user-specific directory
     user_dir = ensure_user_directories(message.from_user.id)
     os.makedirs(user_dir, exist_ok=True)
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     input_path = os.path.join(user_dir, f"input_{timestamp}.txt")
 
     bot = message.bot
@@ -741,9 +742,10 @@ async def _process_accounts_from_document(message: Message, doc: Document) -> No
             # Send result files as documents
             for key, path in files.items():
                 if os.path.exists(path):
+                    input_file = FSInputFile(path, filename=os.path.basename(path))
                     await bot.send_document(
                         chat_id,
-                        document=open(path, "rb"),
+                        document=input_file,
                         caption=f"{key}.txt",
                     )
         except Exception as e:
