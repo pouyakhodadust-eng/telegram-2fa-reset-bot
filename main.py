@@ -104,8 +104,9 @@ def admin_menu_kb() -> InlineKeyboardMarkup:
     )
 
 
-async def ensure_authorized(message: Message) -> bool:
-    user_id = message.from_user.id if message.from_user else None
+async def ensure_authorized(message: Message, user_id: int | None = None) -> bool:
+    if user_id is None:
+        user_id = message.from_user.id if message.from_user else None
     if not user_id:
         return False
     # Always trust the configured main admin ID
@@ -358,7 +359,7 @@ async def cb_back_main(callback: CallbackQuery) -> None:
 async def cb_menu_proxies(callback: CallbackQuery) -> None:
     if not callback.message:
         return
-    if not await ensure_authorized(callback.message):
+    if not await ensure_authorized(callback.message, user_id=callback.from_user.id if callback.from_user else None):
         return
     await callback.answer()
     await callback.message.answer(
@@ -373,7 +374,7 @@ async def cb_menu_proxies(callback: CallbackQuery) -> None:
 async def cb_menu_stats(callback: CallbackQuery) -> None:
     if not callback.message:
         return
-    if not await ensure_authorized(callback.message):
+    if not await ensure_authorized(callback.message, user_id=callback.from_user.id if callback.from_user else None):
         return
 
     await callback.answer()
@@ -428,7 +429,7 @@ async def cmd_proxies(message: Message) -> None:
 async def cb_proxy_add(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.message:
         return
-    if not await ensure_authorized(callback.message):
+    if not await ensure_authorized(callback.message, user_id=callback.from_user.id if callback.from_user else None):
         return
 
     await state.set_state(ProxyStates.adding)
@@ -446,7 +447,7 @@ async def cb_proxy_add(callback: CallbackQuery, state: FSMContext) -> None:
 async def cb_proxy_list(callback: CallbackQuery) -> None:
     if not callback.message:
         return
-    if not await ensure_authorized(callback.message):
+    if not await ensure_authorized(callback.message, user_id=callback.from_user.id if callback.from_user else None):
         return
 
     await callback.answer()
@@ -470,7 +471,7 @@ async def cb_proxy_list(callback: CallbackQuery) -> None:
 async def cb_proxy_remove(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.message:
         return
-    if not await ensure_authorized(callback.message):
+    if not await ensure_authorized(callback.message, user_id=callback.from_user.id if callback.from_user else None):
         return
 
     await state.set_state(ProxyStates.removing)
@@ -784,7 +785,7 @@ async def cmd_process(message: Message) -> None:
 async def cb_menu_process(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.message:
         return
-    if not await ensure_authorized(callback.message):
+    if not await ensure_authorized(callback.message, user_id=callback.from_user.id if callback.from_user else None):
         return
 
     proxies_cnt = await count_proxies(callback.from_user.id)
