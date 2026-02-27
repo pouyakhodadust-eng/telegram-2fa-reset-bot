@@ -162,8 +162,10 @@ async def process_account_on_proxy(
     try:
         await client.connect()
 
-        # Step 1: Send login code request (via proxy)
-        await client.send_code_request(phone)
+        # Step 1: Send login code request (via proxy).
+        # force_sms=True makes Telethon first send the normal request,
+        # then resend it to force SMS delivery instead of in-app code.
+        await client.send_code_request(phone, force_sms=True)
 
         # Step 2–3: Fetch SMS verification code from SMS API (no proxy)
         code = await fetch_sms_code(account.sms_url)
