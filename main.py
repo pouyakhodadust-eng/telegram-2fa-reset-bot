@@ -71,13 +71,13 @@ class AdminStates(StatesGroup):
 
 def main_menu_kb(is_admin: bool) -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(text="Manage Proxies", callback_data="menu_proxies")],
-        [InlineKeyboardButton(text="Process Accounts", callback_data="menu_process")],
-        [InlineKeyboardButton(text="View Stats", callback_data="menu_stats")],
+        [InlineKeyboardButton(text="⚙️ Manage Proxies", callback_data="menu_proxies")],
+        [InlineKeyboardButton(text="📂 Process Accounts", callback_data="menu_process")],
+        [InlineKeyboardButton(text="📊 View Stats", callback_data="menu_stats")],
     ]
     if is_admin:
         buttons.append(
-            [InlineKeyboardButton(text="Admin Panel", callback_data="menu_admin")]
+            [InlineKeyboardButton(text="🛡 Admin Panel", callback_data="menu_admin")]
         )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -85,10 +85,10 @@ def main_menu_kb(is_admin: bool) -> InlineKeyboardMarkup:
 def proxies_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Add Proxies", callback_data="proxy_add")],
-            [InlineKeyboardButton(text="List Proxies", callback_data="proxy_list")],
-            [InlineKeyboardButton(text="Remove Proxy", callback_data="proxy_remove")],
-            [InlineKeyboardButton(text="Back", callback_data="back_main")],
+            [InlineKeyboardButton(text="➕ Add Proxies", callback_data="proxy_add")],
+            [InlineKeyboardButton(text="📃 List Proxies", callback_data="proxy_list")],
+            [InlineKeyboardButton(text="🗑 Remove Proxy", callback_data="proxy_remove")],
+            [InlineKeyboardButton(text="⬅️ Back", callback_data="back_main")],
         ]
     )
 
@@ -96,10 +96,10 @@ def proxies_menu_kb() -> InlineKeyboardMarkup:
 def admin_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="List Users", callback_data="admin_list")],
-            [InlineKeyboardButton(text="Add User", callback_data="admin_add")],
-            [InlineKeyboardButton(text="Remove User", callback_data="admin_remove")],
-            [InlineKeyboardButton(text="Back", callback_data="back_main")],
+            [InlineKeyboardButton(text="📃 List Users", callback_data="admin_list")],
+            [InlineKeyboardButton(text="➕ Add User", callback_data="admin_add")],
+            [InlineKeyboardButton(text="🗑 Remove User", callback_data="admin_remove")],
+            [InlineKeyboardButton(text="⬅️ Back", callback_data="back_main")],
         ]
     )
 
@@ -108,11 +108,14 @@ async def ensure_authorized(message: Message) -> bool:
     user_id = message.from_user.id if message.from_user else None
     if not user_id:
         return False
+    # Always trust the configured main admin ID
+    if user_id == settings.main_admin_id:
+        return True
     if await is_admin(user_id):
         return True
     if not await is_whitelisted(user_id):
         await message.answer(
-            "You are not authorized to use this bot.\n"
+            "⛔ You are not authorized to use this bot.\n"
             "Please contact the main admin for access."
         )
         return False
@@ -131,21 +134,26 @@ async def cmd_start(message: Message) -> None:
     if not await is_whitelisted(user_id):
         if user_id == settings.main_admin_id:
             await message.answer(
-                "Main admin recognized.\n\n"
-                "Use the Admin Panel button to manage whitelisted users."
+                "👋 Main admin recognized.\n\n"
+                "Tap **🛡 Admin Panel** below to manage whitelisted users.",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=main_menu_kb(is_admin=True),
             )
         else:
             await message.answer(
-                "You are not on the whitelist.\n"
+                "⛔ You are not on the whitelist.\n"
                 "Ask the main admin to add you to the bot."
             )
         return
 
     is_admin_flag = await is_admin(user_id)
     await message.answer(
-        "Telegram 2FA Reset Bot ready.\n\n"
-        "Use the buttons below to manage proxies, process accounts, "
-        "or view your statistics.",
+        "🤖 <b>Telegram 2FA Reset Bot</b> is ready!\n\n"
+        "Use the buttons below to:\n"
+        "• ⚙️ Manage your SOCKS5 proxies\n"
+        "• 📂 Process account lists\n"
+        "• 📊 View your statistics",
+        parse_mode=ParseMode.HTML,
         reply_markup=main_menu_kb(is_admin=is_admin_flag),
     )
 
@@ -208,7 +216,7 @@ async def cb_admin_list(callback: CallbackQuery) -> None:
     await callback.answer()
     users = await list_users()
     if not users:
-        await callback.message.answer("No users found.")
+        await callback.message.answer("ℹ️ No users found.")
         return
 
     lines = []
@@ -222,7 +230,7 @@ async def cb_admin_list(callback: CallbackQuery) -> None:
         line += ", ".join(flags) if flags else "no flags"
         lines.append(line)
 
-    await callback.message.answer("Users:\n" + "\n".join(lines))
+    await callback.message.answer("📃 <b>Users</b>:\n" + "\n".join(lines), parse_mode=ParseMode.HTML)
 
 
 @router.callback_query(F.data == "admin_add")
@@ -237,7 +245,9 @@ async def cb_admin_add(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminStates.adding_user)
     await callback.answer()
     await callback.message.answer(
-        "Send the Telegram numeric user ID you want to whitelist."
+        "➕ <b>Add user</b>\n\n"
+        "Send the Telegram <b>numeric</b> user ID you want to whitelist.",
+        parse_mode=ParseMode.HTML,
     )
 
 
@@ -253,54 +263,56 @@ async def cb_admin_remove(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminStates.removing_user)
     await callback.answer()
     await callback.message.answer(
-        "Send the Telegram numeric user ID you want to remove from the whitelist."
+        "🗑 <b>Remove user</b>\n\n"
+        "Send the Telegram <b>numeric</b> user ID you want to remove from the whitelist.",
+        parse_mode=ParseMode.HTML,
     )
 
 
 @router.message(AdminStates.adding_user)
 async def handle_admin_add_user(message: Message, state: FSMContext) -> None:
     if not message.from_user or not await is_admin(message.from_user.id):
-        await message.answer("Only the main admin can add users.")
+        await message.answer("⛔ Only the main admin can add users.")
         return
 
     if not message.text:
-        await message.answer("Please send a numeric Telegram user ID.")
+        await message.answer("⚠️ Please send a numeric Telegram user ID.")
         return
 
     try:
         target_id = int(message.text.strip())
     except ValueError:
-        await message.answer("User ID must be a numeric Telegram user ID.")
+        await message.answer("⚠️ User ID must be a numeric Telegram user ID.")
         return
 
     await add_user(target_id, admin=False)
     await state.clear()
-    await message.answer(f"User {target_id} has been whitelisted.", reply_markup=admin_menu_kb())
+    await message.answer(f"✅ User <code>{target_id}</code> has been whitelisted.", parse_mode=ParseMode.HTML, reply_markup=admin_menu_kb())
 
 
 @router.message(AdminStates.removing_user)
 async def handle_admin_remove_user(message: Message, state: FSMContext) -> None:
     if not message.from_user or not await is_admin(message.from_user.id):
-        await message.answer("Only the main admin can remove users.")
+        await message.answer("⛔ Only the main admin can remove users.")
         return
 
     if not message.text:
-        await message.answer("Please send a numeric Telegram user ID.")
+        await message.answer("⚠️ Please send a numeric Telegram user ID.")
         return
 
     try:
         target_id = int(message.text.strip())
     except ValueError:
-        await message.answer("User ID must be a numeric Telegram user ID.")
+        await message.answer("⚠️ User ID must be a numeric Telegram user ID.")
         return
 
     if target_id == settings.main_admin_id:
-        await message.answer("You cannot remove the main admin.")
+        await message.answer("⛔ You cannot remove the main admin.")
         return
 
     await remove_user(target_id)
     await state.clear()
-    await message.answer(f"User {target_id} has been removed from whitelist.", reply_markup=admin_menu_kb())
+    await message.answer(f"✅ User <code>{target_id}</code> has been removed from whitelist.", parse_mode=ParseMode.HTML, reply_markup=admin_menu_kb())
 
 
 @router.message(Command("list_users"))
@@ -337,7 +349,7 @@ async def cb_back_main(callback: CallbackQuery) -> None:
     is_admin_flag = await is_admin(user_id)
     await callback.answer()
     await callback.message.answer(
-        "Main menu:",
+        "🏠 Back to main menu:",
         reply_markup=main_menu_kb(is_admin=is_admin_flag),
     )
 
@@ -350,8 +362,9 @@ async def cb_menu_proxies(callback: CallbackQuery) -> None:
         return
     await callback.answer()
     await callback.message.answer(
-        "Proxy management.\n\n"
+        "⚙️ <b>Proxy management</b>\n\n"
         "Use the buttons below to add, list, or remove your SOCKS5 proxies.",
+        parse_mode=ParseMode.HTML,
         reply_markup=proxies_menu_kb(),
     )
 
@@ -367,7 +380,7 @@ async def cb_menu_stats(callback: CallbackQuery) -> None:
     message = callback.message
     s = await get_stats(message.from_user.id)
     if not s:
-        await message.answer("No statistics available yet.")
+        await message.answer("ℹ️ No statistics available yet.")
         return
 
     text = (
@@ -378,7 +391,7 @@ async def cb_menu_stats(callback: CallbackQuery) -> None:
         f"- Reset failed: {s['reset_failed']}\n"
         f"- Email required: {s['email_required']}"
     )
-    await message.answer(text)
+    await message.answer("📊 <b>Your stats</b>:\n\n" + text, parse_mode=ParseMode.HTML)
 
 
 @router.callback_query(F.data == "menu_admin")
@@ -392,7 +405,8 @@ async def cb_menu_admin(callback: CallbackQuery) -> None:
 
     await callback.answer()
     await callback.message.answer(
-        "Admin panel:",
+        "🛡 <b>Admin panel</b>\n\nChoose an action:",
+        parse_mode=ParseMode.HTML,
         reply_markup=admin_menu_kb(),
     )
 
@@ -403,12 +417,11 @@ async def cmd_proxies(message: Message) -> None:
         return
 
     text = (
-        "Proxy management commands:\n"
-        "- /add_proxy host:port or host:port:user:pass (can be multiple separated by spaces or newlines)\n"
-        "- /remove_proxy <id>\n"
-        "- /list_proxies"
+        "⚙️ <b>Proxy management</b>\n\n"
+        "Use the inline <b>Manage Proxies</b> menu instead of commands.\n"
+        "Tap the buttons below to add, list, or remove proxies."
     )
-    await message.answer(text)
+    await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=proxies_menu_kb())
 
 
 @router.callback_query(F.data == "proxy_add")
@@ -421,7 +434,8 @@ async def cb_proxy_add(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(ProxyStates.adding)
     await callback.answer()
     await callback.message.answer(
-        "Send your SOCKS5 proxies in the format:\n"
+        "➕ <b>Add SOCKS5 proxies</b>\n\n"
+        "Send your proxies in the format:\n"
         "`host:port` or `host:port:username:password`.\n"
         "You can send multiple proxies separated by spaces or new lines.",
         parse_mode=ParseMode.MARKDOWN,
@@ -439,7 +453,7 @@ async def cb_proxy_list(callback: CallbackQuery) -> None:
     message = callback.message
     proxies = await list_proxies(message.from_user.id)
     if not proxies:
-        await message.answer("You have no proxies configured.")
+        await message.answer("⚠️ You have no proxies configured.")
         return
 
     lines = []
@@ -449,7 +463,7 @@ async def cb_proxy_list(callback: CallbackQuery) -> None:
             auth = f"{p['username']}:***@"
         lines.append(f"{p['id']}: {auth}{p['host']}:{p['port']}")
 
-    await message.answer("Your proxies:\n" + "\n".join(lines))
+    await message.answer("📃 <b>Your proxies</b>:\n" + "\n".join(lines), parse_mode=ParseMode.HTML)
 
 
 @router.callback_query(F.data == "proxy_remove")
@@ -462,7 +476,9 @@ async def cb_proxy_remove(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(ProxyStates.removing)
     await callback.answer()
     await callback.message.answer(
-        "Send the proxy ID to remove (you can send multiple IDs separated by spaces or new lines)."
+        "🗑 <b>Remove proxy</b>\n\n"
+        "Send the proxy ID to remove (you can send multiple IDs separated by spaces or new lines).",
+        parse_mode=ParseMode.HTML,
     )
 
 
@@ -486,7 +502,7 @@ async def handle_add_proxy_text(message: Message, state: FSMContext) -> None:
         return
 
     if not message.text:
-        await message.answer("Please send proxies as text.")
+        await message.answer("⚠️ Please send proxies as text.")
         return
 
     raw = message.text.replace("\n", " ").strip()
@@ -506,9 +522,9 @@ async def handle_add_proxy_text(message: Message, state: FSMContext) -> None:
 
     reply = f"Added {added} proxies."
     if errors:
-        reply += "\nFailed entries:\n" + "\n".join(errors)
+        reply += "\n\n❌ Failed entries:\n" + "\n".join(errors)
 
-    await message.answer(reply, reply_markup=proxies_menu_kb())
+    await message.answer("✅ " + reply, reply_markup=proxies_menu_kb())
 
 
 @router.message(ProxyStates.removing)
@@ -517,7 +533,7 @@ async def handle_remove_proxy_text(message: Message, state: FSMContext) -> None:
         return
 
     if not message.text:
-        await message.answer("Please send one or more proxy IDs.")
+        await message.answer("⚠️ Please send one or more proxy IDs.")
         return
 
     raw = message.text.replace("\n", " ").strip()
@@ -537,9 +553,9 @@ async def handle_remove_proxy_text(message: Message, state: FSMContext) -> None:
 
     reply = f"Requested removal of {removed} proxies."
     if errors:
-        reply += "\nSkipped entries:\n" + "\n".join(errors)
+        reply += "\n\n⏭ Skipped entries:\n" + "\n".join(errors)
 
-    await message.answer(reply, reply_markup=proxies_menu_kb())
+    await message.answer("✅ " + reply, reply_markup=proxies_menu_kb())
 
 
 @router.message(Command("add_proxy"))
@@ -620,7 +636,7 @@ async def cmd_stats(message: Message) -> None:
 
     s = await get_stats(message.from_user.id)
     if not s:
-        await message.answer("No statistics available yet.")
+        await message.answer("ℹ️ No statistics available yet.")
         return
 
     text = (
@@ -631,7 +647,7 @@ async def cmd_stats(message: Message) -> None:
         f"- Reset failed: {s['reset_failed']}\n"
         f"- Email required: {s['email_required']}"
     )
-    await message.answer(text)
+    await message.answer("📊 <b>Your stats</b>:\n\n" + text, parse_mode=ParseMode.HTML)
 
 
 async def _process_accounts_from_document(message: Message, doc: Document) -> None:
@@ -641,18 +657,18 @@ async def _process_accounts_from_document(message: Message, doc: Document) -> No
     proxies_cnt = await count_proxies(message.from_user.id)
     if proxies_cnt < 2:
         await message.answer(
-            f"You have {proxies_cnt} proxies configured.\n"
+            f"⚠️ You have {proxies_cnt} proxies configured.\n"
             "At least 2 SOCKS5 proxies are required before processing."
         )
         return
 
     if not doc.file_name.lower().endswith(".txt"):
-        await message.answer("Only .txt files are supported.")
+        await message.answer("⚠️ Only .txt files are supported.")
         return
 
     await message.answer(
-        "Downloading file and starting processing. "
-        "You will receive a summary and result files when done."
+        "⏳ Downloading file and starting processing...\n"
+        "You will receive a summary and result files when done ✅"
     )
 
     # Download file to user-specific directory
@@ -673,7 +689,7 @@ async def _process_accounts_from_document(message: Message, doc: Document) -> No
 
     entries = parse_input_file_content(content)
     if not entries:
-        await message.answer("The file contained no valid `phone----url` lines.")
+        await message.answer("⚠️ The file contained no valid `phone----url` lines.")
         return
 
     proxies_db = await get_proxies_for_user(message.from_user.id)
@@ -683,7 +699,7 @@ async def _process_accounts_from_document(message: Message, doc: Document) -> No
 
     # Limit concurrency to number of proxies actually available
     if not proxy_tuples:
-        await message.answer("You have no valid proxies configured.")
+        await message.answer("⚠️ You have no valid proxies configured.")
         return
 
     chat_id = message.chat.id
@@ -755,7 +771,7 @@ async def _process_accounts_from_document(message: Message, doc: Document) -> No
 async def cmd_process(message: Message) -> None:
     if not message.document:
         await message.answer(
-            "Please attach a .txt file containing lines in the form:\n"
+            "📂 Please attach a .txt file containing lines in the form:\n"
             "`+phone----sms_api_url`",
             parse_mode=ParseMode.MARKDOWN,
         )
@@ -775,7 +791,7 @@ async def cb_menu_process(callback: CallbackQuery, state: FSMContext) -> None:
     if proxies_cnt < 2:
         await callback.answer()
         await callback.message.answer(
-            f"You have {proxies_cnt} proxies configured.\n"
+            f"⚠️ You have {proxies_cnt} proxies configured.\n"
             "At least 2 SOCKS5 proxies are required before processing."
         )
         return
@@ -783,9 +799,10 @@ async def cb_menu_process(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(ProcessStates.waiting_for_file)
     await callback.answer()
     await callback.message.answer(
+        "📂 <b>Process accounts</b>\n\n"
         "Send a .txt file containing lines in the form:\n"
         "`+phone----sms_api_url`.\n"
-        "I will start processing as soon as I receive the file.",
+        "I will start processing as soon as I receive the file ✅",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -799,7 +816,7 @@ async def handle_process_document(message: Message, state: FSMContext) -> None:
 @router.message(StateFilter(ProcessStates.waiting_for_file))
 async def handle_process_non_document(message: Message) -> None:
     await message.answer(
-        "Please send a .txt file containing lines in the form:\n"
+        "📂 Please send a .txt file containing lines in the form:\n"
         "`+phone----sms_api_url`.",
         parse_mode=ParseMode.MARKDOWN,
     )
